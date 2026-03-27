@@ -1,205 +1,257 @@
-# k6-realtime-metrics-pipeline
+# k6 Realtime Metrics Pipeline
 
-> k6 + Kafka + Kotlin + InfluxDB v3 기반 실시간 부하 테스트 메트릭 파이프라인
-
----
-
-## 프로젝트 개요
-> k6의 실시간 출력 제약을 Kafka로 우회하고, Kotlin Collector를 통해 메트릭을 가공하여 InfluxDB v3에 적재하는 스트리밍 기반 부하 테스트 파이프라인
-
-- 실시간 부하 테스트 메트릭 수집
-- Kafka 기반 스트림 처리
-- Kotlin Collector를 통한 데이터 가공 및 적재
-- InfluxDB v3 시계열 저장
-- Grafana 시각화
-- Terraform + Ansible 기반 Azure 자동화
+k6 기반 부하 테스트 메트릭을 Kafka로 스트리밍하고, Kotlin Collector를 통해 InfluxDB v3에 적재하여 Grafana로 시각화하는 파이프라인이다. Azure 환경에서 Terraform과 Ansible을 통해 인프라 프로비저닝 및 배포를 자동화한다.
 
 ---
 
 ## 아키텍처
+
 ```
 [Load Path]
-k6 -> Kotlin API
+k6 ──────────────────────────────────────► Kotlin API
 
 [Metrics Path]
-k6 -> Kafka -> Kotlin Collector -> InfluxDB v3 -> Grafana
+k6 ──► Kafka (k6-metrics) ──► Kotlin Collector ──► InfluxDB v3 ──► Grafana
 
 [Infra Path]
-Terraform -> Azure 자원 생성
-Ansible -> VM / 실행환경 / 배포 자동화
+Terraform ──► Azure 리소스 생성
+Ansible   ──► VM 환경 구성 및 서비스 배포
 ```
-
-> 부하 트래픽 경로와 메트릭 수집 경로를 분리하여 테스트 정확도를 확보한다.
 
 ---
 
-## 메트릭 경로 분리
-```
-서비스 트래픽: k6 -> Kotlin API
-메트릭 경로: k6 -> Kafka -> Kotlin -> InfluxDB
-```
-- 테스트 대상과 수집 경로 분리
-- 부하 영향 최소화
-- 분석 정확도 확보
+## 기술 스택
+
+| 영역 | 기술 |
+|---|---|
+| 부하 생성 | k6 + xk6-output-kafka |
+| 메시지 버퍼 | Apache Kafka |
+| 메트릭 수집기 | Kotlin (JVM) |
+| 시계열 DB | InfluxDB v3 |
+| 시각화 | Grafana |
+| 테스트 대상 | Kotlin (Spring Boot or Ktor) |
+| IaC | Terraform |
+| 구성 자동화 | Ansible |
+| 클라우드 | Azure |
 
 ---
 
 ## 디렉토리 구조
+
 ```
 k6-realtime-metrics-pipeline/
-├── k6/              # 부하 생성
+│
+├── k6/                         # 부하 테스트 스크립트
+│   ├── scripts/
+│   │   └── single_api_load.js
+│   ├── scenarios/
+│   │   ├── smoke.js
+│   │   ├── load.js
+│   │   └── stress.js
+│   ├── config/
+│   │   └── k6-options.js
+│   ├── docker/
+│   │   └── Dockerfile          # xk6-output-kafka 포함 커스텀 빌드
+│   └── run_k6_test.sh
+│
 ├── kafka/
-├── collector/       # 데이터 처리
-├── observability/   # 저장/시각화
+│   ├── docker-compose.yml      # 로컬 Kafka 단독 실행용
+│   └── config/
+│       └── server.properties
+│
+├── collector/                  # Kotlin Collector
+│   ├── build.gradle.kts
+│   ├── settings.gradle.kts
+│   └── src/main/kotlin/collector/
+│       ├── Application.kt
+│       ├── kafka/KafkaConsumer.kt
+│       ├── processor/MetricsProcessor.kt
+│       ├── influx/InfluxWriter.kt
+│       └── metrics/CollectorMetrics.kt
+│
+├── observability/
+│   ├── grafana/
+│   │   ├── dashboards/k6-dashboard.json
+│   │   └── provisioning/
+│   │       ├── datasources/influxdb.yml
+│   │       └── dashboards/dashboard.yml
+│   └── influxdb/
+│       └── config/influx-config.yml
+│
 ├── infra/
-├── app/             # 테스트 대상
+│   ├── terraform/
+│   │   ├── main.tf
+│   │   ├── variables.tf
+│   │   ├── outputs.tf
+│   │   ├── network.tf
+│   │   ├── vm.tf
+│   │   └── terraform.tfvars
+│   └── ansible/
+│       ├── inventory/hosts.ini
+│       ├── playbooks/
+│       │   ├── setup.yml
+│       │   └── deploy.yml
+│       └── roles/
+│           ├── common/
+│           ├── kafka/
+│           ├── collector/
+│           ├── influxdb/
+│           └── grafana/
+│
+├── app/                        # 테스트 대상 Kotlin API
+│   ├── build.gradle.kts
+│   └── src/main/kotlin/api/Application.kt
+│
 ├── docs/
+│   ├── architecture.md
+│   ├── collector-design.md
+│   ├── influx-schema.md
+│   ├── kafka-strategy.md
+│   └── load-test-results.md
+│
 ├── scripts/
+│   ├── start-local.sh          # 전체 로컬 스택 기동
+│   └── clean.sh
+│
+├── .env
+├── docker-compose.yml          # 로컬 전체 실행 (kafka 포함 통합)
+├── README.md
+└── .gitignore
 ```
 
----
-
-## 특징
-
-- k6 실시간 출력 한계를 Kafka로 우회
-- 메트릭 수집과 서비스 트래픽 경로 분리
-- Kotlin Collector를 통한 데이터 가공 레이어 구성
-- InfluxDB v3 기반 시계열 저장
+> `kafka/docker-compose.yml`은 Kafka 단독 개발 및 검증용이다.
+> 전체 스택 실행은 루트의 `docker-compose.yml`을 사용한다.
 
 ---
 
-## 구성 요소
-### k6
-- HTTP 부하 생성
-- latency / RPS / error rate 수집
-- Kafka로 메트릭 전송
+## 로컬 실행
 
-### Kafka
-- 메트릭 스트림 버퍼
-- producer / consumer 분리
-- burst traffic 흡수
-- 장애 발생 시 메트릭 유실 방지
+### 사전 요구사항
 
-#### k6 → Kafka 전송 방식
+- Docker + Docker Compose
+- Go 1.21 이상 (xk6 빌드용)
+- JDK 17 이상 (Kotlin Collector 빌드용)
 
-k6는 기본적으로 Kafka 출력 기능을 제공하지 않기 때문에   
-xk6-output-kafka extension을 사용하여 메트릭을 Kafka로 전송한다.
+### 환경 변수 설정
 
-### Kotlin Collector
-- Kafka Consumer
-- 메트릭 스키마 표준화
-- 메트릭 가공 / 정규화
-- batch write
-- InfluxDB v3 적재
-
-### InfluxDB v3
-- 시계열 데이터 저장
-- write API 기반 적재
-
-### Grafana
-- 부하 테스트 결과 시각화
-- 시스템 상태 모니터링
-
-### Terraform / Ansible
-- Azure 인프라 생성
-- 실행 환경 구성 및 배포 자동화
-
----
-
-## 실행 환경
-
-- Docker
-- Docker Compose
-- Node.js (k6 실행 시 필요)
-- Java 17+ (Kotlin Collector 실행 시)
-- k6 (또는 Docker 기반 실행)
-
----
-
-## 실행 방법 (로컬)
-### 1. 전체 스택 실행
+```bash
+cp .env.example .env
+# .env에서 INFLUX_TOKEN 등 설정
 ```
+
+### k6 커스텀 바이너리 빌드
+
+```bash
+cd k6/docker
+docker build -t k6-kafka .
+```
+
+> xk6-output-kafka 포함 바이너리 빌드 확인은 프로젝트 시작 전 스파이크 검증을 통해 수행한다.
+> 실제 Kafka 메시지 포맷 확인 방법은 `docs/kafka-strategy.md` 참고.
+
+### 전체 스택 기동
+
+```bash
 docker-compose up -d
 ```
-### 2. k6 테스트 실행
+
+기동 순서: Kafka → InfluxDB v3 → Grafana → Kotlin Collector → Kotlin API
+
+### 부하 테스트 실행
+
+```bash
+# smoke 테스트
+./k6/run_k6_test.sh smoke
+
+# load 테스트
+./k6/run_k6_test.sh load
+
+# stress 테스트
+./k6/run_k6_test.sh stress
 ```
-cd k6
-./run_k6_test.sh
-```
-### 3. Grafana 접속
+
+### Grafana 접속
+
 ```
 http://localhost:3000
+기본 계정: admin / admin
 ```
 
 ---
 
+## 주요 포트
 
-## 데이터 흐름
-```
-k6
- -> Kafka
- -> Kotlin Collector
- -> InfluxDB v3
- -> Grafana
- ```
-
---- 
-
-## 관측 항목
-- RPS
-- p95 / p99 latency
-- error rate
-- status code 분포
-- Kafka lag
-- collector 처리량
-- 큐 적체 상태
+| 서비스 | 포트 |
+|---|---|
+| Kafka | 9092 |
+| InfluxDB v3 | 8086 |
+| Grafana | 3000 |
+| Kotlin API | 8080 |
 
 ---
 
-## 구현 순서
-1. k6 -> Kafka 연결
-2. Kotlin Collector 구현
+## 시각화 항목
+
+| 지표 | 설명 |
+|---|---|
+| RPS | 초당 요청 수 |
+| p95 / p99 latency | 응답 시간 분포 |
+| Error rate | 요청 실패 비율 |
+| Status code 분포 | 2xx / 4xx / 5xx 비율 |
+| Kafka lag | Collector consumer lag |
+| Collector TPS | Collector 처리량 |
+| Buffer size | Collector 내부 버퍼 상태 |
+
+---
+
+## Azure 배포
+
+### 1. 리소스 생성 (Terraform)
+
+```bash
+cd infra/terraform
+terraform init
+terraform plan -var-file=terraform.tfvars
+terraform apply -var-file=terraform.tfvars
+```
+
+### 2. 환경 구성 및 배포 (Ansible)
+
+```bash
+cd infra/ansible
+ansible-playbook -i inventory/hosts.ini playbooks/setup.yml
+ansible-playbook -i inventory/hosts.ini playbooks/deploy.yml
+```
+
+Terraform은 인프라(VM, VNet, NSG, Public IP) 생성을 담당하고, Ansible은 Docker 설치, 서비스 기동, 설정 파일 배치를 담당한다.
+
+자세한 내용은 `docs/architecture.md` 참고.
+
+---
+
+## 문서
+
+| 문서 | 내용 |
+|---|---|
+| [architecture.md](docs/architecture.md) | 전체 구조, 컴포넌트 역할, Azure 배포 구조 |
+| [collector-design.md](docs/collector-design.md) | Kotlin Collector 모듈 설계, 데이터 흐름, 재시도 정책 |
+| [influx-schema.md](docs/influx-schema.md) | InfluxDB v3 measurement 스키마, Grafana 쿼리 예시 |
+| [kafka-strategy.md](docs/kafka-strategy.md) | Kafka 도입 이유, xk6 빌드, topic 설정, 장애 시나리오 |
+| [load-test-results.md](docs/load-test-results.md) | 부하 테스트 결과, 병목 분석, 개선 전후 비교 |
+
+---
+
+## 구현 단계
+
+```
+[완료 목표]
+1. k6 → Kafka 연결 (xk6-output-kafka 빌드 및 검증)
+2. Kotlin Collector 작성 (consume → 가공 → write)
 3. InfluxDB v3 적재 확인
 4. Grafana 대시보드 구성
-5. 성능 개선 사례 확보
-6. Terraform (Azure)
-7. Ansible 배포 자동화
+5. 개선 사례 1건 확보 (병목 발견 → 수정 → 재측정)
 
----
-
-## Azure 구성 (예정)
-### 1차 구조
+[확장]
+6. Azure Terraform (VM, VNet, NSG)
+7. Azure Ansible (Docker 설치, 서비스 기동)
 ```
-Azure VM 1
-- Kafka
-- Collector
-- InfluxDB v3
-- Grafana
-
-외부
-- k6 실행
-
-테스트 대상
-- Kotlin API
-```
-
----
-
-## 성능 검증 기준
-
-- p95 latency 기준 병목 판단
-- error rate 증가 구간 분석
-- RPS 대비 응답시간 변화 확인
-- Kafka lag 기반 처리 지연 확인
-
-### 목표
-- p95 latency 안정 구간 확보
-- error rate 1% 이하 유지
-
-### 결과 분석 (작성 예정)
-- p95 latency
-- throughput
-- error rate
-- 병목 구간
-- 개선 전/후 비교
-
