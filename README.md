@@ -43,15 +43,9 @@ k6-realtime-metrics-pipeline/
 │
 ├── k6/                         # 부하 테스트 스크립트
 │   ├── scripts/
-│   │   └── single_api_load.js
 │   ├── scenarios/
-│   │   ├── smoke.js
-│   │   ├── load.js
-│   │   └── stress.js
 │   ├── config/
-│   │   └── k6-options.js
 │   ├── docker/
-│   │   └── Dockerfile          # xk6-output-kafka 포함 커스텀 빌드
 │   └── run_k6_test.sh
 │
 ├── kafka/
@@ -121,6 +115,18 @@ k6-realtime-metrics-pipeline/
 
 > `kafka/docker-compose.yml`은 Kafka 단독 개발 및 검증용이다.
 > 전체 스택 실행은 루트의 `docker-compose.yml`을 사용한다.
+
+---
+
+## 문서
+
+| 문서 | 내용 |
+|---|---|
+| [architecture.md](docs/architecture.md) | 전체 구조, 컴포넌트 역할, Azure 배포 구조 |
+| [collector-design.md](docs/collector-design.md) | Kotlin Collector 모듈 설계, 데이터 흐름, 재시도 정책 |
+| [influx-schema.md](docs/influx-schema.md) | InfluxDB v3 measurement 스키마, Grafana 쿼리 예시 |
+| [kafka-strategy.md](docs/kafka-strategy.md) | Kafka 도입 이유, xk6 빌드, topic 설정, 장애 시나리오 |
+| [load-test-results.md](docs/load-test-results.md) | 부하 테스트 결과, 병목 분석, 개선 전후 비교 |
 
 ---
 
@@ -226,18 +232,6 @@ ansible-playbook -i inventory/hosts.ini playbooks/deploy.yml
 Terraform은 인프라(VM, VNet, NSG, Public IP) 생성을 담당하고, Ansible은 Docker 설치, 서비스 기동, 설정 파일 배치를 담당한다.
 
 자세한 내용은 `docs/architecture.md` 참고.
-
----
-
-## 문서
-
-| 문서 | 내용 |
-|---|---|
-| [architecture.md](docs/architecture.md) | 전체 구조, 컴포넌트 역할, Azure 배포 구조 |
-| [collector-design.md](docs/collector-design.md) | Kotlin Collector 모듈 설계, 데이터 흐름, 재시도 정책 |
-| [influx-schema.md](docs/influx-schema.md) | InfluxDB v3 measurement 스키마, Grafana 쿼리 예시 |
-| [kafka-strategy.md](docs/kafka-strategy.md) | Kafka 도입 이유, xk6 빌드, topic 설정, 장애 시나리오 |
-| [load-test-results.md](docs/load-test-results.md) | 부하 테스트 결과, 병목 분석, 개선 전후 비교 |
 
 ---
 

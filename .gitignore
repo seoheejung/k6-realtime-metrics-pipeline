@@ -1,0 +1,86 @@
+# =========================
+# OS / Editor
+# =========================
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# =========================
+# Environment files
+# =========================
+.env
+.env.*
+!.env.example
+
+# =========================
+# Logs
+# =========================
+*.log
+logs/
+*.out
+
+# =========================
+# Node / JS
+# =========================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# =========================
+# Java / Kotlin / Gradle
+# =========================
+.gradle/
+build/
+out/
+*.class
+*.jar
+*.war
+*.ear
+
+# =========================
+# k6 build artifacts
+# =========================
+k6/results/
+k6/tmp/
+
+# =========================
+# Terraform
+# =========================
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraform.lock.hcl
+
+# =========================
+# Ansible
+# =========================
+*.retry
+
+# =========================
+# Docker
+# =========================
+docker-data/
+*.pid
+
+# =========================
+# Test / Coverage
+# =========================
+coverage/
+htmlcov/
+.pytest_cache/
+
+# =========================
+# Misc
+# =========================
+tmp/
+temp/
+.cache/

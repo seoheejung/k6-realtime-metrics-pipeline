@@ -1,0 +1,51 @@
+# =========================
+# Git / Editor
+# =========================
+.git
+.gitignore
+.vscode
+.idea
+
+# =========================
+# Environment
+# =========================
+.env
+.env.*
+!.env.example
+
+# =========================
+# Docs
+# =========================
+docs/
+
+# =========================
+# Logs / Temp
+# =========================
+*.log
+logs/
+tmp/
+temp/
+.cache/
+
+# =========================
+# Build artifacts
+# =========================
+**/build/
+**/.gradle/
+**/out/
+**/node_modules/
+**/coverage/
+
+# =========================
+# Terraform / Ansible
+# =========================
+infra/terraform/.terraform/
+infra/terraform/*.tfstate
+infra/terraform/*.tfstate.*
+infra/ansible/*.retry
+
+# =========================
+# OS files
+# =========================
+.DS_Store
+Thumbs.db
