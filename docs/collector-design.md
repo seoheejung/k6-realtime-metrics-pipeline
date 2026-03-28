@@ -1,188 +1,270 @@
 # Collector Design
 
-## 역할 요약
+## 1. 목적
 
-Kotlin Collector는 Kafka에서 k6 메트릭을 consume하여 정규화한 뒤 InfluxDB v3에 batch write한다.
-부가적으로 자신의 내부 상태(처리량, 실패율, 큐 적체)를 InfluxDB에 함께 적재하여 Grafana에서 조회 가능하게 한다.
+Kafka로 전달된 k6 메트릭을 실시간으로 수집하고,
+정규화 후 InfluxDB v3에 적재하는 스트리밍 처리 컴포넌트이다.
 
----
+이 모듈은 다음 역할에 집중한다:
 
-## 모듈 구조
-
-```
-collector/
-└── src/main/kotlin/collector/
-    ├── Application.kt          ← 진입점, 의존성 조립
-    ├── kafka/
-    │   └── KafkaConsumer.kt    ← Kafka consume 루프
-    ├── processor/
-    │   └── MetricsProcessor.kt ← 메트릭 변환 및 정규화
-    ├── influx/
-    │   └── InfluxWriter.kt     ← batch write, 재시도
-    └── metrics/
-        └── CollectorMetrics.kt ← 내부 상태 수집 및 HTTP 노출
-```
+* 실시간 메트릭 ingestion
+* 최소 가공(normalization)
+* 안정적인 write (retry + batch)
+* 자체 상태 관측 가능성 확보
 
 ---
 
-## 데이터 흐름
+## 2. 아키텍처 개요
 
 ```
-Kafka (k6-metrics)
-  └─► KafkaConsumer       ← poll loop, offset 관리
-        └─► MetricsProcessor  ← 필드 정규화, 태그 구조화
-              └─► InfluxWriter   ← 버퍼 누적 → batch write
-                    └─► InfluxDB v3 /api/v3/write_lp
+k6 → Kafka → Collector → InfluxDB → Grafana
 ```
+
+Collector는 **stateless stream processor**로 동작하며,
+데이터 저장 책임은 InfluxDB에 위임한다.
 
 ---
 
-## KafkaConsumer
+## 3. 모듈 구조
 
-**역할:** topic `k6-metrics`를 구독하고 레코드를 MetricsProcessor로 전달한다.
-
-```kotlin
-// 핵심 설정값 (application.yml에서 주입)
-bootstrap.servers: <kafka-host>:9092
-group.id: kotlin-collector
-auto.offset.reset: earliest
-enable.auto.commit: false   // 수동 commit, 처리 보장
+```
+com/pipeline/collector/
+├── Application.kt
+├── config/
+├── model/
+├── kafka/
+├── processor/
+├── influx/
+└── metrics/
 ```
 
-- 처리 완료 후 수동 offset commit
-- poll timeout: 500ms
-- write 성공 시 offset commit
-- write 실패 시 commit하지 않고 재시도
-- 재시도 소진 시:
-  - 해당 레코드를 dead-letter 로그로 기록
-  - offset commit 수행 (무한 재처리 방지)
+### 역할 분리
+
+| 모듈        | 역할                  |
+| --------- | ------------------- |
+| kafka     | 메시지 수신 (Ingress)    |
+| processor | 데이터 변환 (Pure logic) |
+| influx    | 데이터 적재 (Egress)     |
+| metrics   | 내부 상태 관측            |
+| config    | 설정 로딩 및 변환          |
 
 ---
 
-## MetricsProcessor
-
-**역할:** raw Kafka 레코드를 InfluxDB line protocol 형태로 변환한다.
-
-### 입력 예시 (k6 Kafka output 포맷)
-
-```json
-{
-  "metric": "http_req_duration",
-  "type": "Point",
-  "data": {
-    "time": "2024-01-01T00:00:00.000Z",
-    "value": 123.45,
-    "tags": {
-      "method": "GET",
-      "status": "200",
-      "url": "http://api/endpoint",
-      "scenario": "load"
-    }
-  }
-}
-```
-
-### 출력 예시 (line protocol)
+## 4. 데이터 흐름
 
 ```
-http_req_duration,method=GET,status=200,scenario=load value=123.45 1704067200000000000
+KafkaConsumer
+  → MetricsProcessor
+    → InfluxWriter (buffer)
+      → batch flush
+        → InfluxDB
 ```
 
-### 정규화 규칙
+### 특징
 
-| 항목 | 처리 내용 |
-|---|---|
-| metric name | snake_case 유지, 공백 제거 |
-| tag 값 | 공백 → `_`, 빈 값 → 제외 |
-| timestamp | ISO8601 → Unix nanosecond |
-| value | Double, NaN/Infinity → 해당 포인트 제외 |
-| url 태그 | 쿼리스트링 제거 (cardinality 폭발 방지) |
+* pull 기반 처리 (poll loop)
+* synchronous 처리 모델
+* batch write 적용
+* offset commit은 write 이후 수행
 
 ---
 
-## InfluxWriter
-
-**역할:** 변환된 포인트를 버퍼에 누적하고 조건 충족 시 batch write한다.
-
-### Flush 조건 (둘 중 먼저 충족되는 쪽)
-
-| 조건 | 기본값 |
-|---|---|
-| 버퍼 누적 건수 | 500건 |
-| 경과 시간 | 1,000ms |
-
-### Write 설정
+## 5. 처리 보장 모델
 
 ```
-endpoint: /api/v3/write_lp
-method:   POST
-headers:  Authorization: Token <token>
-          Content-Type: text/plain; charset=utf-8
-database: k6_metrics
+Delivery Semantics: At-Least-Once
 ```
 
-### 재시도 정책
+### 동작 방식
 
-```
-최대 재시도: 3회
-대기 시간:   1s → 2s → 4s (exponential backoff)
-재시도 대상: HTTP 429, 5xx
-즉시 포기:   HTTP 4xx (400, 401, 403)
-```
+* Kafka offset commit은 Influx write 성공 이후 수행
+* write 실패 시 commit하지 않음 → 재처리 발생
+* 동일 데이터 중복 저장 가능
 
-재시도 소진 시 해당 배치를 dead-letter 로그로 기록하고 계속 진행한다.
+### 의도
+
+* 데이터 유실 방지 우선
+* 중복 허용 (Influx 특성상 큰 문제 아님)
 
 ---
 
-## CollectorMetrics
+## 6. 데이터 정규화 전략
 
-**역할:** Collector 내부 메트릭은 InfluxDB에 write하고 Grafana에서 조회한다.
+### 입력
 
-### 노출 방식
+* k6 Kafka output (JSON)
 
-InfluxDB에 별도 measurement로 write한다. Grafana에서 동일한 datasource로 조회 가능하다.
-Prometheus endpoint는 추가 컴포넌트(Prometheus 서버)가 필요하므로 배제한다.
+### 출력
+
+* InfluxDB Line Protocol
+
+### 규칙
+
+| 항목        | 처리                 |
+| --------- | ------------------ |
+| metric    | 공백 제거              |
+| tag       | 공백 → `_`, null 제거  |
+| timestamp | ISO → nanosecond   |
+| value     | Double, NaN/Inf 제외 |
+| url       | query 제거           |
+
+### 의도
+
+* cardinality 폭발 방지
+* 저장 구조 단순화
+* query 기반 분석 유도
+
+---
+
+## 7. Batch 처리 전략
+
+### Flush 조건
+
+| 조건             | 값      |
+| -------------- | ------ |
+| batch-size     | 500    |
+| flush-interval | 1000ms |
+
+둘 중 먼저 만족 시 flush
+
+### 의도
+
+* write 성능 확보
+* latency와 throughput 균형
+
+---
+
+## 8. 재시도 정책
+
+```
+max-retries: 3
+backoff: 1s → 2s → 4s
+```
+
+### 대상
+
+* HTTP 429
+* HTTP 5xx
+
+### 제외
+
+* 400 / 401 / 403
+
+### 실패 시
+
+* dead-letter 로그 기록
+* batch 폐기
+
+---
+
+## 9. 장애 처리 전략
+
+### 1. JSON 파싱 실패
+
+* 해당 메시지 skip
+* 실패 카운트 증가
+
+### 2. Influx write 실패
+
+* retry 수행
+* 실패 시 dead-letter 기록
+
+### 3. batch flush 실패
+
+* batch 폐기
+* offset commit 수행
+
+### 결과
+
+* 일부 데이터 유실 가능
+* 무한 재처리 방지
+
+---
+
+## 10. 내부 메트릭
 
 ### measurement: `collector_stats`
 
-| 필드 | 설명 |
-|---|---|
-| `processed_total` | 총 처리 건수 |
-| `failed_total` | 총 실패 건수 |
-| `tps` | 초당 처리 건수 |
-| `buffer_size` | 현재 버퍼 누적 건수 |
-| `kafka_lag` | consumer lag (topic 전체 합산) |
-| `last_flush_ms` | 마지막 flush 소요 시간 (ms) |
+| 필드              | 설명         |
+| --------------- | ---------- |
+| processed_total | 처리 건수      |
+| failed_total    | 실패 건수      |
+| tps             | 처리량        |
+| buffer_size     | 버퍼 상태      |
+| kafka_lag       | 현재 0 (미구현) |
+| last_flush_ms   | flush 시간   |
 
-write 주기: 5초
+### 특징
 
----
-
-## application.yml 구조
-
-```yaml
-kafka:
-  bootstrap-servers: localhost:9092
-  topic: k6-metrics
-  group-id: kotlin-collector
-  poll-timeout-ms: 500
-
-influx:
-  url: http://localhost:8086
-  token: ${INFLUX_TOKEN}
-  database: k6_metrics
-  batch-size: 500
-  flush-interval-ms: 1000
-  max-retries: 3
-
-collector:
-  stats-write-interval-ms: 5000
-```
+* InfluxDB에 동일 경로로 저장
+* Grafana에서 직접 조회 가능
 
 ---
 
-## 고려사항
+## 11. 설계 의도
 
-- k6 Kafka output의 실제 메시지 포맷은 extension 버전에 따라 다를 수 있다. 첫 연동 시 raw 메시지를 로그로 찍어 포맷을 확인한 후 MetricsProcessor를 작성한다.
-- url 태그의 cardinality 관리가 중요하다. 동적 경로(`/user/123`)는 정규화(`/user/:id`)하거나 태그에서 제외한다.
-- Kafka consumer lag은 Kafka AdminClient API로 조회한다.
+### 1. 단순성 유지
+
+* Spring / DI 미사용
+* 최소한의 구조
+
+### 2. 상태 최소화
+
+* Collector는 상태를 거의 가지지 않음
+* Kafka + Influx에 책임 분산
+
+### 3. 실시간 처리 우선
+
+* batch는 있지만 지연 최소화
+
+### 4. 확장 가능성 확보
+
+* Kafka lag 추가 가능
+* DLQ Kafka 전환 가능
+
+---
+
+## 12. 트레이드오프
+
+### 1. Exactly-Once 미지원
+
+* 구현 복잡도 증가 방지
+* 대신 At-Least-Once 채택
+
+### 2. DLQ → 파일 기반
+
+* 단순 구현
+* 운영 환경에서는 Kafka DLQ 필요
+
+### 3. Aggregation 미적용
+
+* Collector 단순화
+* 대신 Influx query 비용 증가
+
+### 4. Kafka lag 미구현
+
+* 초기 구현 단순화
+* 추후 AdminClient 확장 필요
+
+---
+
+## 13. 확장 방향
+
+* Kafka AdminClient 기반 lag 측정
+* DLQ → Kafka topic 전환
+* metric aggregation (window 기반)
+* multi-field metric 지원
+* Prometheus exporter 추가
+
+---
+
+## 14. 고려사항
+
+* k6 Kafka 메시지 포맷은 버전별 차이가 있음 → 최초 연동 시 raw 로그 확인 필요
+* URL tag는 cardinality 증가 요인 → query 제거 적용, 필요 시 path 정규화 고려
+* Kafka lag은 현재 미구현 → backlog 모니터링 필요 시 AdminClient 확장
+* Influx schema는 단일 field 구조 → 복잡한 분석은 query 레이어에서 처리
+* DLQ는 파일 기반 → 운영 환경에서는 Kafka DLQ 전환 필요
+
+---
+

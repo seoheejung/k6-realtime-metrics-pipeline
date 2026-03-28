@@ -1,0 +1,33 @@
+kafka:
+  # Kafka 브로커 주소
+  bootstrap-servers: ${KAFKA_BROKER}
+  # 수집할 토픽 이름
+  topic: ${KAFKA_TOPIC}
+  # Consumer Group ID
+  group-id: ${KAFKA_GROUP_ID}
+  # poll 호출 대기 시간 (ms)
+  poll-timeout-ms: ${KAFKA_POLL_TIMEOUT_MS}
+  # 그룹에 저장된 offset이 없을 때 시작 위치
+  auto-offset-reset: ${KAFKA_AUTO_OFFSET_RESET}
+
+influx:
+  # InfluxDB base URL
+  url: ${INFLUX_URL}
+  # 인증 토큰
+  token: ${INFLUX_TOKEN}
+  # InfluxDB v3 database 이름
+  database: ${INFLUX_DATABASE}
+  # 버퍼가 이 건수에 도달하면 flush
+  batch-size: ${INFLUX_BATCH_SIZE}
+  # batch-size 미도달이어도 이 시간 지나면 flush
+  flush-interval-ms: ${INFLUX_FLUSH_INTERVAL_MS}
+  # write 실패 시 최대 재시도 횟수
+  max-retries: ${INFLUX_MAX_RETRIES}
+  # HTTP 요청 timeout
+  timeout-ms: ${INFLUX_TIMEOUT_MS}
+
+collector:
+  # Collector 내부 상태를 InfluxDB에 기록하는 주기
+  stats-write-interval-ms: ${COLLECTOR_STATS_WRITE_INTERVAL_MS}
+  # write 최종 실패 시 dead-letter 로그 저장 경로
+  dead-letter-path: ${COLLECTOR_DEAD_LETTER_PATH}

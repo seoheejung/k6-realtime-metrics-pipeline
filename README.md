@@ -239,8 +239,9 @@ Terraform은 인프라(VM, VNet, NSG, Public IP) 생성을 담당하고, Ansible
 
 ```
 [완료 목표]
-1. k6 → Kafka 연결 (xk6-output-kafka 빌드 및 검증)
+1. k6 작성 (부하 테스트)
 2. Kotlin Collector 작성 (consume → 가공 → write)
+3. k6 → Kafka 연결 (xk6-output-kafka 빌드 및 검증)
 3. InfluxDB v3 적재 확인
 4. Grafana 대시보드 구성
 5. 개선 사례 1건 확보 (병목 발견 → 수정 → 재측정)
