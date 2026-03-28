@@ -268,3 +268,17 @@ backoff: 1s → 2s → 4s
 
 ---
 
+## 15. 처리 모델 (Buffer & Backpressure)
+
+KafkaConsumer는 poll batch 단위로 메시지를 수신하고,
+내부 버퍼를 통해 처리와 write 단계를 분리한다.
+
+* buffer를 통해 ingestion과 write를 decoupling
+* write 지연 시 backlog 발생 가능
+
+Backpressure 발생 시:
+
+* 일정 임계치 초과 시 drop 또는 throttling 적용 가능
+* 현재 구현은 drop 없이 처리, 향후 정책 확장 가능
+
+---
