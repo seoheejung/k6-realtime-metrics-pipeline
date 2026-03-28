@@ -133,16 +133,13 @@ k6-realtime-metrics-pipeline/
 ## 로컬 실행
 
 ### 사전 요구사항
-
 - Docker + Docker Compose
 - Go 1.21 이상 (xk6 빌드용)
-- JDK 17 이상 (Kotlin Collector 빌드용)
 
 ### 환경 변수 설정
-
+- .env에서 INFLUX_TOKEN 등 설정
 ```bash
 cp .env.example .env
-# .env에서 INFLUX_TOKEN 등 설정
 ```
 
 ### k6 커스텀 바이너리 빌드
@@ -155,13 +152,16 @@ docker build -t k6-kafka .
 > xk6-output-kafka 포함 바이너리 빌드 확인은 프로젝트 시작 전 스파이크 검증을 통해 수행한다.
 > 실제 Kafka 메시지 포맷 확인 방법은 `docs/kafka-strategy.md` 참고.
 
-### 전체 스택 기동
+### 메트릭 파이프라인 기동 (root 디렉토리)
 
 ```bash
-docker-compose up -d
+docker compose up -d
+
+# 실행 확인
+docker compose ps
 ```
 
-기동 순서: Kafka → InfluxDB v3 → Grafana → Kotlin Collector → Kotlin API
+> 기동 순서: Kafka → InfluxDB v3 → Grafana → Kotlin Collector → Kotlin API
 
 ### 부하 테스트 실행
 

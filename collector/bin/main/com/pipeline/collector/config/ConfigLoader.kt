@@ -1,9 +1,10 @@
 package com.pipeline.collector.config
 
 import com.fasterxml.jackson.databind.DeserializationFeature
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.dataformat.yaml.YAMLFactory
-import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.fasterxml.jackson.module.kotlin.readValue
+import com.fasterxml.jackson.module.kotlin.registerKotlinModule
 import java.io.File
 
 object ConfigLoader {
@@ -15,15 +16,16 @@ object ConfigLoader {
         // 1) resources/application.yml 원문 읽기
         val yamlTemplate = loadYamlTemplate()
 
-        // 2) .env 파일과 시스템 환경변수를 합쳐서 변수 맵 구성
-        //    같은 키가 있을 경우 시스템 환경변수가 우선
+        // 2) .env 파일 + 시스템 환경변수 병합
+        //    같은 키면 시스템 환경변수가 우선
         val envMap = loadDotEnv() + System.getenv()
 
-        // 3) ${KEY} 형식을 실제 값으로 치환
+        // 3) ${KEY} -> 실제 값 치환
         val resolvedYaml = replacePlaceholders(yamlTemplate, envMap)
 
-        // 4) 치환이 끝난 YAML 문자열을 AppConfig로 파싱
-        val mapper = jacksonObjectMapper(YAMLFactory())
+        // 4) YAML 문자열을 AppConfig로 변환
+        val mapper = ObjectMapper(YAMLFactory())
+            .registerKotlinModule()
             .configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false)
 
         return mapper.readValue(resolvedYaml)
@@ -39,7 +41,6 @@ object ConfigLoader {
     private fun loadDotEnv(): Map<String, String> {
         val envFile = File(".env")
 
-        // .env가 없으면 빈 맵 반환
         if (!envFile.exists()) {
             return emptyMap()
         }
@@ -51,7 +52,6 @@ object ConfigLoader {
             .filter { it.isNotEmpty() }
             .filterNot { it.startsWith("#") }
             .forEach { line ->
-                // KEY=VALUE 형태가 아니면 무시
                 val idx = line.indexOf("=")
                 if (idx <= 0) return@forEach
 
@@ -70,7 +70,6 @@ object ConfigLoader {
     ): String {
         return placeholderRegex.replace(yamlTemplate) { match ->
             val key = match.groupValues[1]
-
             envMap[key]
                 ?: throw IllegalStateException("Missing config value for placeholder: $key")
         }

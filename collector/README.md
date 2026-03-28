@@ -43,6 +43,9 @@ InfluxDB v3
 collector/
 ├── build.gradle.kts
 ├── settings.gradle.kts
+├── Dockerfile
+├── .dockerignore
+├── .env
 └── src/main/
     ├── kotlin/
     │   └── com/pipeline/collector/

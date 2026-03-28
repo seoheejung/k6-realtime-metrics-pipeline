@@ -1,0 +1,13 @@
+build/
+.gradle/
+
+.idea/
+*.iml
+
+.DS_Store
+Thumbs.db
+
+.git
+.gitignore
+
+.env
