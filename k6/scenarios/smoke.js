@@ -10,5 +10,6 @@ import { executeSingleApiLoad } from "../scripts/single_api_load.js";
 export const options = buildScenarioOptions("smoke");
 
 export default function () {
-    executeSingleApiLoad();
+    // smoke는 빠른 연결 확인이 목적이라 sleep을 주지 않는다.
+    executeSingleApiLoad({ sleepSeconds: 0 });
 }

@@ -9,5 +9,6 @@ import { executeSingleApiLoad } from "../scripts/single_api_load.js";
 export const options = buildScenarioOptions("load");
 
 export default function () {
-    executeSingleApiLoad();
+    // load는 요청 간 아주 짧은 기본 간격을 둔다.
+    executeSingleApiLoad({ sleepSeconds: 1 });
 }

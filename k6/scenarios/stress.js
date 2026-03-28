@@ -9,5 +9,6 @@ import { executeSingleApiLoad } from "../scripts/single_api_load.js";
 export const options = buildScenarioOptions("stress");
 
 export default function () {
-    executeSingleApiLoad();
+    // stress도 요청 간 간격은 유지하되, VU 증가로 전체 압력을 높이는 방식으로 본다.
+    executeSingleApiLoad({ sleepSeconds: 1 });
 }

@@ -27,6 +27,7 @@ k6/
 │   ├── load.js                # 정상 부하 테스트
 │   └── stress.js              # 점진적 부하 증가 테스트
 ├── config/
+│   ├── env.js                 # requireEnv 중복 제거용
 │   └── k6-options.js          # 시나리오별 공통 옵션
 ├── docker/
 │   └── Dockerfile             # xk6-output-kafka 포함 커스텀 k6 빌드
@@ -38,7 +39,7 @@ k6/
 
 ## 실행 전 준비
 ### 1. .env 파일 준비
-- .env.example 파일 이름 수정
+- `.env.example` 파일을 복사하여 `k6/.env` 파일 생성
 
 ### 2. 실행 권한 부여
 
