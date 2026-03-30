@@ -1,20 +1,35 @@
+buildscript {
+    repositories {
+        mavenCentral() // 플러그인 포털 대신 메이븐 중앙 저장소 활용
+        gradlePluginPortal()
+    }
+    dependencies {
+        classpath("com.github.johnrengelman:shadow:8.1.1")
+    }
+}
 plugins {
     // Kotlin JVM 프로젝트
     kotlin("jvm") version "2.0.21"
 
+    // 실행 entrypoint 지정용
     application
+
 }
+
+// buildscript에서 가져온 플러그인을 프로젝트에 강제 적용
+apply(plugin = "com.github.johnrengelman.shadow")
+
 
 group = "com.pipeline"
 version = "0.1.0"
 
 repositories {
     mavenCentral()
+
 }
 
 dependencies {
-
-    // Kotlin 표준 라이브러리 명시 (에러 방지 강화)
+    // Kotlin 표준 라이브러리
     implementation(kotlin("stdlib"))
 
     // Kafka Consumer client
@@ -40,10 +55,22 @@ kotlin {
 }
 
 application {
-    // Kotlin의 top-level main 함수는 파일명 + Kt 로 잡힘
+    // Kotlin top-level main 함수 진입점
     mainClass.set("com.pipeline.collector.ApplicationKt")
 }
 
-tasks.test {
-    useJUnitPlatform()
+// Shadow 8.1.1 + Gradle 8.x 충돌 방지를 위해 배포 태스크 비활성화
+tasks {
+    named("distZip") { enabled = false }
+    named("distTar") { enabled = false }
+}
+
+// shadowJar를 문자열로 찾아 타입 캐스팅하여 설정 (컴파일 에러 해결)
+tasks.named<com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar>("shadowJar") {
+    archiveBaseName.set("collector")
+    archiveClassifier.set("")
+    archiveVersion.set("")
+    manifest {
+        attributes["Main-Class"] = "com.pipeline.collector.ApplicationKt"
+    }
 }

@@ -1,26 +1,39 @@
-version: "3.8"
-
 services:
   kafka:
-    image: bitnami/kafka:latest
+    image: apache/kafka:4.2.0
     container_name: kafka
+    hostname: kafka
     ports:
       - "9092:9092"
+      - "29092:29092"
     environment:
-      - ALLOW_PLAINTEXT_LISTENER=yes
-      - KAFKA_CFG_NODE_ID=0
-      - KAFKA_CFG_PROCESS_ROLES=controller,broker
-      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
-      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
-      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
-      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
-      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=0@kafka:9093
+      # KRaft 단일 노드 식별자
+      KAFKA_NODE_ID: 1
+      # broker + controller 겸용 단일 노드
+      KAFKA_PROCESS_ROLES: broker,controller
+      # controller quorum 설정
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      # 리스너 이름별 프로토콜 매핑
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT
+      # 컨테이너 내부/외부 통신용 리스너
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,PLAINTEXT_HOST://0.0.0.0:29092,CONTROLLER://0.0.0.0:29093
+      # 다른 컨테이너가 kafka:9092로 붙을 수 있게 광고
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,PLAINTEXT_HOST://host.docker.internal:29092
+      # broker 간 통신 리스너 이름
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      # controller 리스너 이름
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      # 단일 노드 개발용
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
     volumes:
-      - kafka_data:/bitnami/kafka
+      - kafka_data:/var/lib/kafka/data
 
   influxdb:
     image: influxdb:3-core
     container_name: influxdb
+    user: "0:0"
     ports:
       - "8181:8181"
     command:

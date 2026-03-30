@@ -167,13 +167,20 @@ COLLECTOR_DEAD_LETTER_PATH=./logs/dead-letter.log
 ### 3. 실행
 
 ```
-./gradlew run
+./gradlew clean shadowJar
 ```
 
 또는
 
 ```
 java -jar build/libs/collector.jar
+```
+
+### 4. docker compose로 확인 (root 디렉토리)
+```
+docker compose build collector
+docker compose up -d collector
+docker logs collector --tail 100
 ```
 
 ---

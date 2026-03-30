@@ -1,6 +1,8 @@
 # k6 Realtime Metrics Pipeline
 
-k6 기반 부하 테스트 메트릭을 Kafka로 스트리밍하고, Kotlin Collector를 통해 InfluxDB v3에 적재하여 Grafana로 시각화하는 파이프라인이다. Azure 환경에서 Terraform과 Ansible을 통해 인프라 프로비저닝 및 배포를 자동화한다.
+k6 기반 부하 테스트 메트릭을 Kafka로 스트리밍하고, Kotlin Collector를 통해 InfluxDB v3에 적재한 뒤 Grafana로 시각화하는 파이프라인이다.    
+부하 경로와 메트릭 경로를 분리해 테스트 대상 API와 관측 파이프라인을 독립적으로 다룬다.    
+Azure 환경에서는 Terraform과 Ansible로 인프라 생성과 배포 자동화를 수행한다.
 
 ---
 
@@ -29,7 +31,7 @@ Ansible   ──► VM 환경 구성 및 서비스 배포
 | 메트릭 수집기 | Kotlin (JVM) |
 | 시계열 DB | InfluxDB v3 |
 | 시각화 | Grafana |
-| 테스트 대상 | Kotlin (Spring Boot or Ktor) |
+| 테스트 대상 | Kotlin API |
 | IaC | Terraform |
 | 구성 자동화 | Ansible |
 | 클라우드 | Azure |
@@ -92,7 +94,7 @@ k6-realtime-metrics-pipeline/
 │           ├── influxdb/
 │           └── grafana/
 │
-├── app/                        # 테스트 대상 Kotlin API
+├── app/                        # 부하 테스트 대상 Kotlin API
 │   ├── build.gradle.kts
 │   └── src/main/kotlin/api/Application.kt
 │
@@ -135,9 +137,10 @@ k6-realtime-metrics-pipeline/
 ### 사전 요구사항
 - Docker + Docker Compose
 - Go 1.21 이상 (xk6 빌드용)
+- JDK 17 이상 (Collector / Kotlin API 빌드용)
 
 ### 환경 변수 설정
-- .env에서 INFLUX_TOKEN 등 설정
+- `.env`에 Kafka, InfluxDB, Grafana, Kotlin API 실행 값을 정의
 ```bash
 cp .env.example .env
 ```
@@ -155,13 +158,17 @@ docker build -t k6-kafka .
 ### 메트릭 파이프라인 기동 (root 디렉토리)
 
 ```bash
+# 1. 기존 컨테이너와 볼륨 정리
+docker compose down -v
+
+# 2. 전체 스택 기동
 docker compose up -d
 
-# 실행 확인
+# 3. 상태 확인
 docker compose ps
 ```
 
-> 기동 순서: Kafka → InfluxDB v3 → Grafana → Kotlin Collector → Kotlin API
+> 기본 기동 순서: Kafka → InfluxDB v3 → Grafana → Kotlin Collector → Kotlin API
 
 ### 부하 테스트 실행
 
@@ -186,27 +193,26 @@ http://localhost:3000
 ---
 
 ## 주요 포트
+| 서비스         | 포트           |
+| ----------- | ------------ |
+| Kafka       | 9092 / 29092 |
+| InfluxDB v3 | 8181         |
+| Grafana     | 3000         |
+| Kotlin API  | 8080         |
 
-| 서비스 | 포트 |
-|---|---|
-| Kafka | 9092 |
-| InfluxDB v3 | 8086 |
-| Grafana | 3000 |
-| Kotlin API | 8080 |
 
 ---
 
 ## 시각화 항목
-
-| 지표 | 설명 |
-|---|---|
-| RPS | 초당 요청 수 |
-| p95 / p99 latency | 응답 시간 분포 |
-| Error rate | 요청 실패 비율 |
-| Status code 분포 | 2xx / 4xx / 5xx 비율 |
-| Kafka lag | Collector consumer lag |
-| Collector TPS | Collector 처리량 |
-| Buffer size | Collector 내부 버퍼 상태 |
+| 지표                | 설명                     |
+| ----------------- | ---------------------- |
+| RPS               | 초당 요청 수                |
+| p95 / p99 latency | 응답 시간 분포               |
+| Error rate        | 요청 실패 비율               |
+| Status code 분포    | 2xx / 4xx / 5xx 비율     |
+| Kafka lag         | Collector consumer lag |
+| Collector TPS     | Collector 처리량          |
+| Buffer size       | Collector 내부 버퍼 상태     |
 
 ---
 
@@ -239,14 +245,15 @@ Terraform은 인프라(VM, VNet, NSG, Public IP) 생성을 담당하고, Ansible
 
 ```
 [완료 목표]
-1. k6 작성 (부하 테스트)
-2. Kotlin Collector 작성 (consume → 가공 → write)
-3. k6 → Kafka 연결 (xk6-output-kafka 빌드 및 검증)
-3. InfluxDB v3 적재 확인
-4. Grafana 대시보드 구성
-5. 개선 사례 1건 확보 (병목 발견 → 수정 → 재측정)
+1. 부하 대상 Kotlin API 작성 및 실행 경로 확보
+2. k6 작성 (부하 테스트) ✅
+3. Kotlin Collector 작성 (consume → 가공 → write) ✅
+4. k6 → Kafka 연결 (xk6-output-kafka 빌드 및 검증) ✅
+5. InfluxDB v3 적재 확인
+6. Grafana 대시보드 구성
+7. 개선 사례 1건 확보 (병목 발견 → 수정 → 재측정)
 
 [확장]
-6. Azure Terraform (VM, VNet, NSG)
-7. Azure Ansible (Docker 설치, 서비스 기동)
+8. Azure Terraform (VM, VNet, NSG)
+9. Azure Ansible (Docker 설치, 서비스 기동)
 ```
