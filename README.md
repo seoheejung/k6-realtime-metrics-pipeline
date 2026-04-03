@@ -53,19 +53,23 @@ k6-realtime-metrics-pipeline/
 ├── kafka/
 │   ├── docker-compose.yml      # 로컬 Kafka 단독 실행용
 │   └── config/
-│       └── server.properties
 │
 ├── collector/                  # Kotlin Collector
-│   ├── build.gradle.kts
 │   ├── settings.gradle.kts
-│   └── src/main/kotlin/collector/
-│       ├── Application.kt
-│       ├── kafka/KafkaConsumer.kt
-│       ├── processor/MetricsProcessor.kt
-│       ├── influx/InfluxWriter.kt
-│       └── metrics/CollectorMetrics.kt
+│   ├── build.gradle.kts
+│   └── src/main/
+│       ├── kotlin/
+│       │   └── com/pipeline/collector/
+│       │       ├── Application.kt         # 실행 진입점
+│       │       ├── config/
+│       │       ├── model/
+│       │       ├── kafka/
+│       │       ├── processor/
+│       │       ├── influx/
+│       │       └── metrics/
+│       └── resources/
 │
-├── observability/
+├── observability/                       # Grafana / InfluxDB 설정
 │   ├── grafana/
 │   │   ├── dashboards/k6-dashboard.json
 │   │   └── provisioning/
@@ -95,8 +99,18 @@ k6-realtime-metrics-pipeline/
 │           └── grafana/
 │
 ├── app/                        # 부하 테스트 대상 Kotlin API
+│   ├── settings.gradle.kts
 │   ├── build.gradle.kts
-│   └── src/main/kotlin/api/Application.kt
+│   └── src/
+│       ├── main/
+│       │   ├── kotlin/
+│       │   │   └── com/pipeline/api/
+│       │   │       ├── Application.kt
+│       │   │       ├── controller/
+│       │   │       ├── dto/
+│       │   │       └── service/
+│       │   └── resources/
+│       └── test/
 │
 ├── docs/
 │   ├── architecture.md
@@ -172,28 +186,70 @@ feature/xxx
 
 ## 로컬 실행
 
-### 사전 요구사항
+### 0. 사전 요구사항
 - Docker + Docker Compose
 - Go 1.21 이상 (xk6 빌드용)
 - JDK 17 이상 (Collector / Kotlin API 빌드용)
+- Gradle Wrapper 사용 가능 환경
 
-### 환경 변수 설정
-- `.env`에 Kafka, InfluxDB, Grafana, Kotlin API 실행 값을 정의
-```bash
+### 1. 환경 변수 설정
+
+- 실행 위치 기준으로 관리
+
+#### 루트 디렉토리
+- 루트 `.env`는 전체 `docker compose` 실행 시 사용
+```
 cp .env.example .env
 ```
 
-### k6 커스텀 바이너리 빌드
+#### collector 디렉토리
+- collector 단독 실행 시 Kafka, InfluxDB 연결 값은 collector 기준 설정으로 관리
+```
+cd collector
+./gradlew bootRun
+```
+
+#### app 디렉토리
+- app 단독 실행 시 application.yml 또는 환경 변수 기준으로 실행
+```
+cd app
+./gradlew bootRun
+```
+
+
+### 2. k6 커스텀 바이너리 빌드
 
 ```bash
 cd k6/docker
 docker build -t k6-kafka .
+cd ../..
 ```
 
 > xk6-output-kafka 포함 바이너리 빌드 확인은 프로젝트 시작 전 스파이크 검증을 통해 수행한다.
 > 실제 Kafka 메시지 포맷 확인 방법은 `docs/kafka-strategy.md` 참고.
 
-### 메트릭 파이프라인 기동 (root 디렉토리)
+### 3. Collector / Kotlin API 빌드
+
+- 각 컴포넌트는 독립 Gradle 프로젝트로 관리
+
+#### Collector 빌드
+```
+cd collector
+./gradlew clean build
+cd ..
+```
+
+#### Kotlin API 빌드
+```
+cd app
+./gradlew clean build
+cd ..
+```
+
+> 단독 실행 모드는 개발/디버깅 용도이며,   
+> 실제 파이프라인 검증은 docker compose 기반 통합 실행을 기준으로 한다.
+
+### 4. 메트릭 파이프라인 기동 (root 디렉토리)
 
 ```bash
 # 1. 기존 컨테이너와 볼륨 정리
@@ -206,9 +262,29 @@ docker compose up -d
 docker compose ps
 ```
 
-> 기본 기동 순서: Kafka → InfluxDB v3 → Grafana → Kotlin Collector → Kotlin API
+- docker-compose.yml 기준으로 전체 로컬 스택 한 번에 기동
+- 기본 기동 순서: Kafka → InfluxDB v3 → Grafana → Kotlin Collector → Kotlin API
 
-### 부하 테스트 실행
+> 서비스는 docker compose로 동시에 기동되며,   
+> Collector는 Kafka, InfluxDB 준비 상태를 전제로 동작한다.   
+> 초기 기동 시 일부 재시도 로그가 발생할 수 있다.   
+
+### 5. 단독 실행 확인
+
+#### Kotlin API 확인
+```
+curl http://localhost:8080/api/health
+```
+#### Grafana 확인
+```
+curl http://localhost:3000
+```
+#### Collector 로그 확인
+```
+docker compose logs -f collector
+```
+
+### 6. 부하 테스트 실행
 
 ```bash
 # smoke 테스트
@@ -221,7 +297,11 @@ docker compose ps
 ./k6/run_k6_test.sh stress
 ```
 
-### Grafana 접속
+- run_k6_test.sh는 환경 변수 BASE_URL을 기준으로 Kotlin API에 요청을 보낸다.
+    - 기본값: http://localhost:8080
+    - docker compose 환경: http://app:8080 (컨테이너 내부 DNS)
+
+### 7. Grafana 접속
 
 ```
 http://localhost:3000
@@ -230,18 +310,39 @@ http://localhost:3000
 
 ---
 
-## 주요 포트
-| 서비스         | 포트           |
-| ----------- | ------------ |
-| Kafka       | 9092 / 29092 |
-| InfluxDB v3 | 8181         |
-| Grafana     | 3000         |
-| Kotlin API  | 8080         |
+## 정상 동작 기준
 
+1. k6 실행 시 오류 없이 요청 전송
+2. Kafka topic(k6-metrics)에 메시지 유입
+3. Collector 로그에서 consume 확인
+4. InfluxDB write 성공 로그 확인
+5. Grafana에서 데이터 시각화 확인
+
+### 장애 확인 포인트
+
+- docker compose ps에서 모든 핵심 컨테이너가 Up 상태인지 확인
+- app 헬스체크가 200 OK인지 확인
+- collector 로그에 Kafka consume / Influx write 오류가 없는지 확인
+- Grafana에서 InfluxDB datasource가 정상 연결됐는지 확인
+- Collector가 Kafka 연결 실패 후 재시도 로그를 출력하는 것은 정상 동작일 수 있음
+- InfluxDB 연결 실패 로그도 초기 기동 시 일시적으로 발생 가능
+
+---
+
+## 주요 포트
+
+| 서비스         | 포트           | 설명 |
+|---------------|----------------|------|
+| Kafka         | 9092           | 내부 통신 |
+| Kafka         | 29092          | 외부 접근 (k6 등) |
+| InfluxDB v3   | 8181           | write/query API |
+| Grafana       | 3000           | 대시보드 |
+| Kotlin API    | 8080           | 부하 테스트 대상 |
 
 ---
 
 ## 시각화 항목
+
 | 지표                | 설명                     |
 | ----------------- | ---------------------- |
 | RPS               | 초당 요청 수                |
@@ -283,7 +384,7 @@ Terraform은 인프라(VM, VNet, NSG, Public IP) 생성을 담당하고, Ansible
 
 ```
 [완료 목표]
-1. 부하 대상 Kotlin API 작성 및 실행 경로 확보
+1. 부하 대상 Kotlin API 작성 및 실행 경로 확보 ✅
 2. k6 작성 (부하 테스트) ✅
 3. Kotlin Collector 작성 (consume → 가공 → write) ✅
 4. k6 → Kafka 연결 (xk6-output-kafka 빌드 및 검증) ✅

@@ -1,0 +1,13 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: kotlin-api
+
+logging:
+  level:
+    # 전체 로그 레벨
+    root: INFO
+    # 웹 요청 관련 로그 레벨
+    org.springframework.web: INFO
