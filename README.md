@@ -120,6 +120,44 @@ k6-realtime-metrics-pipeline/
 
 ---
 
+## 변경 관리 프로세스 (Git Workflow)
+
+### PR 사용 목적
+- 인프라 변경으로 인한 장애 리스크 통제 목적
+- 협업 도구가 아닌 변경 검증 게이트로 사용
+- 코드 리뷰가 아닌 self-review 강제 수단
+- 설정 변경이 Kafka, InfluxDB, API 전체에 영향을 주므로 변경 단위 분리 및 사전 검증 필요
+
+### 작업 흐름
+
+```bash
+git checkout -b feature/xxx
+git add .
+git commit -m "feat: xxx"
+git push origin feature/xxx
+```
+1. 기능 단위 브랜치 생성 후 작업 수행
+2. 원격 저장소로 push
+3. PR 생성 (`Compare & pull request`)
+4. 체크리스트 기반 검증
+5. 검증 완료 후 main 브랜치로 merge
+6. CI/CD를 통한 배포 진행
+
+### 검증 방식
+- 체크리스트 기반 self-review
+- 모든 PR 동일 기준 적용
+- `.github/pull_request_template.md`를 통해 자동 적용
+
+### 브랜치 전략
+```
+feature/xxx
+```
+- 기능 단위로 브랜치 분리
+- main 브랜치는 항상 배포 가능한 상태 유지
+- main 브랜치 직접 커밋 금지
+
+---
+
 ## 문서
 
 | 문서 | 내용 |
