@@ -134,6 +134,7 @@ KAFKA_AUTO_OFFSET_RESET=earliest
 
 # InfluxDB v3
 INFLUX_URL=http://localhost:8181
+# 실제 실행 전 InfluxDB v3에서 생성한 토큰으로 교체
 INFLUX_TOKEN=your-token
 INFLUX_DATABASE=k6_metrics
 INFLUX_BATCH_SIZE=500
@@ -148,7 +149,40 @@ COLLECTOR_DEAD_LETTER_PATH=./logs/dead-letter.log
 
 ---
 
-### 2. 설정 로딩 방식
+### 2. InfluxDB v3 토큰 생성
+
+`INFLUX_TOKEN=your-token`은 예시 값이다.  
+실행 전 반드시 실제 토큰을 생성해서 `.env`에 반영해야 한다.
+
+- 토큰 생성
+```bash
+docker exec -it influxdb influxdb3 create token --admin
+```
+
+- 토큰 생성 명령이 다르게 동작하는 경우 아래도 확인 필요
+```bash
+docker exec -it influxdb influxdb3 --help
+```
+
+- 정상 생성 시 출력되는 토큰 값을 복사해서 .env에 반영
+```bash
+INFLUX_TOKEN=<실제 생성한 토큰>
+```
+
+- 토큰 반영 후 collector를 다시 기동
+```bash
+docker compose down
+docker compose up -d
+```
+
+- 반영 확인
+```bash
+docker exec collector env
+```
+
+---
+
+### 3. 설정 로딩 방식
 
 1. `application.yml` 로드
 2. `.env` 파일 로드
@@ -156,7 +190,7 @@ COLLECTOR_DEAD_LETTER_PATH=./logs/dead-letter.log
 4. `${ENV_KEY}` 치환
 5. AppConfig로 변환
 
-우선순위:
+#### 우선순위
 
 ```
 시스템 환경변수 > .env > application.yml 기본값
@@ -164,20 +198,20 @@ COLLECTOR_DEAD_LETTER_PATH=./logs/dead-letter.log
 
 ---
 
-### 3. 실행
+### 4. 실행
 
-```
+```bash
 ./gradlew clean shadowJar
 ```
 
 또는
 
-```
+```bash
 java -jar build/libs/collector.jar
 ```
 
-### 4. docker compose로 확인 (root 디렉토리)
-```
+### 5. docker compose로 확인 (root 디렉토리)
+```bash
 docker compose build collector
 docker compose up -d collector
 docker logs collector --tail 100
