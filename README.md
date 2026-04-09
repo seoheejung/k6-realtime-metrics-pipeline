@@ -112,6 +112,7 @@ k6-realtime-metrics-pipeline/
 │   ├── architecture.md
 │   ├── collector-design.md
 │   ├── influx-schema.md
+│   ├── influx-write-validation.md
 │   ├── kafka-strategy.md
 │   └── load-test-results.md
 │
@@ -174,8 +175,9 @@ feature/xxx
 |---|---|
 | [architecture.md](docs/architecture.md) | 전체 구조, 컴포넌트 역할, Azure 배포 구조 |
 | [collector-design.md](docs/collector-design.md) | Kotlin Collector 모듈 설계, 데이터 흐름, 재시도 정책 |
-| [influx-schema.md](docs/influx-schema.md) | InfluxDB v3 measurement 스키마, Grafana 쿼리 예시 |
 | [kafka-strategy.md](docs/kafka-strategy.md) | Kafka topic 설정, bootstrap 주소 규칙, consumer 설정, offset 및 장애 처리 정책 |
+| [influx-schema.md](docs/influx-schema.md) | InfluxDB v3 measurement 스키마, Grafana 쿼리 예시 |
+| [influx-write-validation.md](docs/influx-write-validation.md) | InfluxDB v3 적재 검증 절차 (필수 검증 기준) |
 | [load-test-results.md](docs/load-test-results.md) | 부하 테스트 결과, 병목 분석, 개선 전후 비교 |
 
 ---
@@ -248,8 +250,8 @@ cd ..
 ### 4. 메트릭 파이프라인 기동 (root 디렉토리)
 
 ```bash
-# 1. 기존 컨테이너와 볼륨 정리
-docker compose down -v
+# 1. 기존 컨테이너 정리
+docker compose down
 
 # 2. 전체 스택 기동
 docker compose up -d
@@ -311,8 +313,9 @@ http://localhost:3000
 1. k6 실행 시 오류 없이 요청 전송
 2. Kafka topic(k6-metrics)에 메시지 유입
 3. Collector 로그에서 consume 확인
-4. InfluxDB write 성공 로그 확인
-5. Grafana에서 데이터 시각화 확인
+4. InfluxDB write 성공 및 WAL flush 로그 확인
+5. InfluxDB에 데이터 실제 적재 확인 (measurement 생성 및 누적)
+6. Grafana에서 데이터 시각화 확인
 
 ### 장애 확인 포인트
 
@@ -322,6 +325,7 @@ http://localhost:3000
 - Grafana에서 InfluxDB datasource가 정상 연결됐는지 확인
 - Collector가 Kafka 연결 실패 후 재시도 로그를 출력하는 것은 정상 동작일 수 있음
 - InfluxDB 연결 실패 로그도 초기 기동 시 일시적으로 발생 가능
+- InfluxDB에서 `401` 또는 `InvalidToken` 발생 시 INFLUX_TOKEN 값 확인
 
 ---
 
@@ -384,7 +388,7 @@ Terraform은 인프라(VM, VNet, NSG, Public IP) 생성을 담당하고, Ansible
 2. k6 작성 (부하 테스트) ✅
 3. Kotlin Collector 작성 (consume → 가공 → write) ✅
 4. k6 → Kafka 연결 (xk6-output-kafka 빌드 및 검증) ✅
-5. InfluxDB v3 적재 확인
+5. InfluxDB v3 적재 확인 ✅
 6. Grafana 대시보드 구성
 7. 개선 사례 1건 확보 (병목 발견 → 수정 → 재측정)
 

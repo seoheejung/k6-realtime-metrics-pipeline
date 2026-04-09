@@ -6,9 +6,14 @@
 |---|---|
 | 버전 | InfluxDB v3 (IOx 기반) |
 | Write endpoint | `/api/v3/write_lp` |
-| 인증 | Token (Authorization: Token <token>) |
+| 인증 | Bearer Token (Authorization: Bearer <token>) |
 | Database | `k6_metrics` |
 | 데이터 형식 | Line Protocol |
+
+### 인증 방식
+
+- HTTP Header: `Authorization: Bearer <token>`
+- 토큰은 InfluxDB v3에서 생성 후 환경변수(`INFLUX_TOKEN`)로 주입
 
 ---
 
