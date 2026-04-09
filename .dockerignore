@@ -35,7 +35,7 @@ temp/
 **/out/
 **/node_modules/
 **/coverage/
-
+**/bin/
 # =========================
 # Terraform / Ansible
 # =========================
