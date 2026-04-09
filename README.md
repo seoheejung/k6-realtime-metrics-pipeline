@@ -50,10 +50,6 @@ k6-realtime-metrics-pipeline/
 │   ├── docker/
 │   └── run_k6_test.sh
 │
-├── kafka/
-│   ├── docker-compose.yml      # 로컬 Kafka 단독 실행용
-│   └── config/
-│
 ├── collector/                  # Kotlin Collector
 │   ├── settings.gradle.kts
 │   ├── build.gradle.kts
@@ -179,7 +175,7 @@ feature/xxx
 | [architecture.md](docs/architecture.md) | 전체 구조, 컴포넌트 역할, Azure 배포 구조 |
 | [collector-design.md](docs/collector-design.md) | Kotlin Collector 모듈 설계, 데이터 흐름, 재시도 정책 |
 | [influx-schema.md](docs/influx-schema.md) | InfluxDB v3 measurement 스키마, Grafana 쿼리 예시 |
-| [kafka-strategy.md](docs/kafka-strategy.md) | Kafka 도입 이유, xk6 빌드, topic 설정, 장애 시나리오 |
+| [kafka-strategy.md](docs/kafka-strategy.md) | Kafka topic 설정, bootstrap 주소 규칙, consumer 설정, offset 및 장애 처리 정책 |
 | [load-test-results.md](docs/load-test-results.md) | 부하 테스트 결과, 병목 분석, 개선 전후 비교 |
 
 ---

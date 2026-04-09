@@ -25,7 +25,6 @@ services:
       KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
       # 단일 노드 개발용
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
-
       KAFKA_LOG_DIRS: /var/lib/kafka/data
     volumes:
       - kafka_data:/var/lib/kafka/data
@@ -44,6 +43,14 @@ services:
       - --data-dir=/var/lib/influxdb3/data
     volumes:
       - influxdb_data:/var/lib/influxdb3/data
+
+  app:
+    build:
+      context: ./app
+    container_name: app
+    hostname: app
+    ports:
+      - "8080:8080"
 
   collector:
     build:

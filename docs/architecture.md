@@ -30,7 +30,7 @@ Ansible   ──► VM 환경 구성 및 서비스 배포
 | 컴포넌트 | 역할 | 비고 |
 |---|---|---|
 | k6 | 부하 생성 + 메트릭 발행 | 대상 API 호출 + Kafka로 메트릭 전송 |
-| Kafka | 메트릭 스트림 버퍼 | topic: `k6-metrics` |
+| Kafka | 메트릭 스트림 버퍼 | topic: `k6-metrics`, 내부 `9092`, host 접근 `29092` |
 | Kotlin Collector | Kafka consume → 가공 → InfluxDB write | batch write, 재시도, 내부 처리 메트릭 |
 | InfluxDB v3 | 시계열 데이터 저장 | line protocol write (`/api/v3/write_lp`) |
 | Grafana | 결과 및 상태 시각화 | datasource: InfluxDB v3 |
@@ -59,11 +59,11 @@ Ansible   ──► VM 환경 구성 및 서비스 배포
 ```
 Docker Network (compose)
 
-k6 (host 실행)
+k6 (host 실행, BASE_URL=http://localhost:8080)
 ├──► Kotlin API (container, :8080)
-└──► Kafka (container, :9092)
+└──► Kafka (container, :29092)
 
-Kafka
+Kafka (:9092 internal / :29092 external)
 └──► Kotlin Collector
 
 Kotlin Collector
@@ -75,8 +75,10 @@ Grafana
 
 ### 핵심 포인트
 - Kotlin API는 반드시 실행되어야 함 (부하 대상)
+- host에서 실행하는 k6는 Kafka 외부 포트 29092를 사용
+- Kotlin Collector는 Kafka 내부 주소 kafka:9092를 사용
 - Collector는 외부 포트를 열지 않음 (내부 처리 전용)
-- Kafka / Influx / Collector는 동일 네트워크에서 동작
+- Kafka / InfluxDB / Collector / API는 동일 docker network에서 동작
 
 ---
 
@@ -128,14 +130,16 @@ VNet: 10.0.0.0/16
 
 ### NSG 인바운드 포트
 
-| 포트 | 용도 |
-|---|---|
-| 22 | SSH |
-| 9092 | Kafka |
-| 8181 | InfluxDB v3 |
-| 3000 | Grafana |
-| 8080 | Kotlin API |
+| 포트 | 용도 | 비고 |
+|---|---|---|
+| 22 | SSH | 관리자 접근 |
+| 3000 | Grafana | 대시보드 접속 |
+| 8080 | Kotlin API | 외부 부하 테스트 진입점 |
+| 8181 | InfluxDB v3 | 필요 시에만 개방 |
+| 9092 | Kafka | 외부 k6 또는 외부 producer 연결이 필요한 경우에만 개방 |
 
+- Kafka는 기본적으로 내부 통신 기준으로 사용한다.
+- 외부에서 k6 또는 producer가 직접 접속해야 하는 경우에만 NSG로 Kafka 포트를 개방한다.
 
 ---
 

@@ -1,5 +1,5 @@
 # build stage
-FROM gradle:8.7-jdk17 AS builder
+FROM gradle:8.10.2-jdk17 AS builder
 WORKDIR /app
 COPY . .
 RUN gradle clean shadowJar --no-daemon
