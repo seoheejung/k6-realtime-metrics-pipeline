@@ -4,13 +4,21 @@
 
 ---
 
+## 목적
+
+k6의 실시간 메트릭 출력 제약을 Kafka로 우회하고,
+Collector에서 가공 후 InfluxDB에 적재하여
+실시간 모니터링 및 분석 파이프라인을 구성한다.
+
+---
+
 ## 역할
 
-* Kafka Topic으로 전달된 k6 메트릭 이벤트 소비
-* JSON 기반 메트릭 데이터를 내부 모델로 변환
-* InfluxDB Line Protocol 형태로 정규화
-* InfluxDB v3에 batch write 수행
-* 처리 상태 및 내부 메트릭을 InfluxDB에 기록
+- Kafka Topic으로 전달된 k6 메트릭 이벤트 소비
+- JSON 기반 메트릭 데이터를 내부 모델로 변환
+- InfluxDB Line Protocol 형태로 정규화
+- InfluxDB v3에 batch write 수행
+- 처리 상태 및 내부 메트릭을 InfluxDB에 기록
 
 ---
 
@@ -32,8 +40,8 @@ InfluxDB v3
 
 ## 처리 단위
 
-* 입력: Kafka 메시지 (JSON)
-* 출력: InfluxDB Line Protocol
+- 입력: Kafka 메시지 (JSON)
+- 출력: InfluxDB Line Protocol
 
 ---
 
@@ -76,45 +84,47 @@ collector/
 
 ### KafkaConsumer
 
-* Kafka broker 연결 및 topic 구독
-* poll loop 수행
-* 처리 성공 시 offset commit
-* write 실패 시 commit하지 않음 (재처리 보장)
+- Kafka broker 연결 및 topic 구독
+- poll loop 수행
+- 처리 성공 시 offset commit
+- write 실패 시 commit하지 않음 (재처리 보장)
 
 ---
 
 ### MetricsProcessor
 
-* Kafka raw JSON → 내부 모델 변환
-* tag / field 분리
-* timestamp → nanosecond 변환
-* URL query 제거 (cardinality 제한)
+- Kafka raw JSON → 내부 모델 변환
+- tag / field 분리
+- timestamp → nanosecond 변환
+- URL query 제거 (cardinality 제한)
 
 ---
 
 ### InfluxWriter
 
-* Line Protocol 버퍼링
-* batch 조건:
+- Line Protocol 버퍼링
+- HTTP write 수행 (`/api/v3/write_lp`)
+- retry (exponential backoff)
+- write 성공 / 실패 / 재시도 / latency 로그 기록
+- 최종 실패 시 dead-letter 파일 기록
 
-  * 건수 (`batch-size`)
-  * 시간 (`flush-interval-ms`)
-* HTTP write 수행 (`/api/v3/write_lp`)
-* retry (exponential backoff)
-* 최종 실패 시 dead-letter 파일 기록
+#### batch 조건
+- 건수 (`batch-size`)
+- 시간 (`flush-interval-ms`)
 
 ---
 
 ### CollectorMetrics
 
-* processed_total
-* failed_total
-* buffer_size
-* tps
-* kafka_lag (현재 미구현, placeholder)
-* last_flush_ms
+- processed_total
+- failed_total
+- buffer_size
+- tps
+- kafka_lag (현재 미구현, placeholder)
+- last_flush_ms
 
-→ InfluxDB에 `collector_stats` measurement로 기록
+→ InfluxDB에 `collector_stats` measurement로 기록   
+→ 처리 실패 여부, 버퍼 상태, flush 지연, 처리량을 추적하기 위한 내부 메트릭
 
 ---
 
@@ -232,37 +242,56 @@ docker logs collector --tail 100
 
 ---
 
+## 로그 확인 포인트
+
+- batch flush 시작 로그
+- Influx write 성공 로그
+- retry 발생 로그
+- 최종 실패 시 dead-letter 기록 로그
+
+→ InfluxDB 로그에서는 WAL flush 발생 여부를 확인한다.
+
+---
+
+## 운영 기준
+
+- write 성공 로그 + WAL flush + SQL 조회 결과가 모두 확인되어야 정상으로 판단한다.
+
+---
+
 ## 실패 처리 기준
 
-* JSON 파싱 실패 → skip + 실패 카운트 증가
-* Influx write 실패 → retry 수행
-* retry 실패 → dead-letter 로그 기록
-* Kafka commit → batch 전체 성공 시만 수행
+- JSON 파싱 실패 → skip + 실패 카운트 증가
+- Influx write 실패 → retry 수행
+- retry 실패 → dead-letter 로그 기록
+- write 실패 시 status code / response body 로그 기록
+- Kafka commit → batch 전체 성공 시만 수행
 
 ---
 
 ## 확장 포인트
 
-* Kafka lag 실측 (AdminClient)
-* dead-letter → Kafka DLQ topic 전환
-* metric aggregation (window 기반 집계)
-* URL path 템플릿화 (`/user/:id`)
-* multi-field metric 지원
-* Prometheus exporter 추가
+- Kafka lag 실측 (AdminClient)
+- dead-letter → Kafka DLQ topic 전환
+- metric aggregation (window 기반 집계)
+- URL path 템플릿화 (`/user/:id`)
+- multi-field metric 지원
+- Prometheus exporter 추가
 
 ---
 
 ## 제한 사항
 
-* Kafka lag 미구현 (0 고정)
-* DLQ topic 미구현 (파일 기반 로그)
-* 단일 field(value)만 지원
-* Influx schema 고정
+- Kafka lag 미구현 (0 고정)
+- DLQ topic 미구현 (파일 기반 로그)
+- 단일 field(value)만 지원
+- Influx schema 고정
 
 ---
 
-## 목적
+## 관련 문서
 
-k6의 실시간 메트릭 출력 제약을 Kafka로 우회하고,
-Collector에서 가공 후 InfluxDB에 적재하여
-실시간 모니터링 및 분석 파이프라인을 구성한다.
+- [influx-write-validation.md](../docs/influx-write-validation.md)
+
+→ InfluxDB v3 적재 검증 절차 및 실제 결과 확인
+
