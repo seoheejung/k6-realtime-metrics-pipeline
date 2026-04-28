@@ -114,6 +114,7 @@ k6-realtime-metrics-pipeline/
 │   ├── influx-schema.md
 │   ├── influx-write-validation.md
 │   ├── kafka-strategy.md
+│   ├── grafana-dashboard.md
 │   └── load-test-results.md
 │
 ├── scripts/
