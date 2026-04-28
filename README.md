@@ -67,7 +67,7 @@ k6-realtime-metrics-pipeline/
 │
 ├── observability/                       # Grafana / InfluxDB 설정
 │   ├── grafana/
-│   │   ├── dashboards/k6-dashboard.json
+│   │   ├── dashboards/k6-realtime-metrics.json
 │   │   └── provisioning/
 │   │       ├── datasources/influxdb.yml
 │   │       └── dashboards/dashboard.yml
@@ -179,6 +179,7 @@ feature/xxx
 | [influx-schema.md](docs/influx-schema.md) | InfluxDB v3 measurement 스키마, Grafana 쿼리 예시 |
 | [influx-write-validation.md](docs/influx-write-validation.md) | InfluxDB v3 적재 검증 절차 (필수 검증 기준) |
 | [load-test-results.md](docs/load-test-results.md) | 부하 테스트 결과, 병목 분석, 개선 전후 비교 |
+| [grafana-dashboard.md](docs/grafana-dashboard.md) | Grafana 대시보드 구성, 쿼리, 검증 기준 |
 
 ---
 
@@ -322,6 +323,7 @@ GRAFANA_ADMIN_PASSWORD=<local-password>
 4. InfluxDB write 성공 및 WAL flush 로그 확인
 5. InfluxDB에 데이터 실제 적재 확인 (measurement 생성 및 누적)
 6. Grafana에서 데이터 시각화 확인
+7. Grafana 대시보드에서 주요 메트릭(Response Time, Requests, VUs, Collector Stats) 정상 표시
 
 ### 장애 확인 포인트
 
@@ -351,13 +353,12 @@ GRAFANA_ADMIN_PASSWORD=<local-password>
 
 | 지표                | 설명                     |
 | ----------------- | ---------------------- |
-| RPS               | 초당 요청 수                |
-| p95 / p99 latency | 응답 시간 분포               |
-| Error rate        | 요청 실패 비율               |
-| Status code 분포    | 2xx / 4xx / 5xx 비율     |
-| Kafka lag         | Collector consumer lag |
-| Collector TPS     | Collector 처리량          |
-| Buffer size       | Collector 내부 버퍼 상태     |
+| Response Time     | 요청 응답 시간 |
+| Requests (RPS)    | 초당 요청 수 |
+| Failed Requests   | 실패율 |
+| VUs               | 가상 유저 수 |
+| Collector TPS     | Collector 처리량 |
+| Kafka lag         | Kafka consumer lag |
 
 ---
 
@@ -395,8 +396,9 @@ Terraform은 인프라(VM, VNet, NSG, Public IP) 생성을 담당하고, Ansible
 3. Kotlin Collector 작성 (consume → 가공 → write) ✅
 4. k6 → Kafka 연결 (xk6-output-kafka 빌드 및 검증) ✅
 5. InfluxDB v3 적재 확인 ✅
-6. Grafana 대시보드 구성
-7. 개선 사례 1건 확보 (병목 발견 → 수정 → 재측정)
+6. Grafana 대시보드 구성 ✅
+7. Grafana provisioning 구성 (datasource / dashboard 자동 로드)
+8. 개선 사례 1건 확보 (병목 발견 → 수정 → 재측정)
 
 [확장]
 8. Azure Terraform (VM, VNet, NSG)
