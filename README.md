@@ -300,11 +300,17 @@ docker compose logs -f collector
     - docker compose 환경: http://app:8080 (컨테이너 내부 DNS)
 
 ### 7. Grafana 접속
-
 ```
 http://localhost:3000
-기본 계정: admin / admin
 ```
+
+- Grafana 관리자 계정은 루트 `.env`에서 설정한다.
+```env
+GRAFANA_ADMIN_USER=admin
+GRAFANA_ADMIN_PASSWORD=<local-password>
+```
+- 실제 비밀번호는 Git에 커밋하지 않는다.
+- .env.example에는 예시 값만 둔다.
 
 ---
 
