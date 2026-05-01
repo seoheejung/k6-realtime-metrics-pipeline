@@ -1,0 +1,26 @@
+# Grafana datasource provisioning
+# 컨테이너 시작 시 InfluxDB datasource를 자동 등록한다.
+
+apiVersion: 1
+
+datasources:
+  - name: InfluxDB                # Grafana에서 보이는 datasource 이름
+    type: influxdb               # datasource 타입 (InfluxDB)
+    access: proxy                # Grafana 서버를 통해 요청 (필수)
+    url: http://influxdb:8181    # Docker 내부 서비스명으로 접근 (localhost 사용 불가)
+    database: k6_metrics         # InfluxDB v3에서 사용할 database
+    isDefault: true              # 기본 datasource로 설정
+    editable: true               # UI에서 수정 가능 여부
+
+    jsonData:
+      version: InfluxQL          # Query language (SQL 아님)
+      httpMode: GET              # InfluxQL은 GET 방식 사용
+
+      # Custom Header 이름 정의
+      # Authorization 헤더를 사용하기 위해 필요
+      httpHeaderName1: Authorization
+
+    secureJsonData:
+      # 실제 Header 값
+      # Token 인증 방식 사용 (InfluxDB v3)
+      httpHeaderValue1: Bearer $__env{INFLUX_TOKEN}

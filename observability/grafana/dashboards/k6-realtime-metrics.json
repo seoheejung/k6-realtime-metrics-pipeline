@@ -63,7 +63,7 @@
                       "group": "influxdb",
                       "version": "v0",
                       "datasource": {
-                        "name": "cfkgpikynwnwgb"
+                        "name": "InfluxDB"
                       },
                       "spec": {
                         "groupBy": [
@@ -213,7 +213,7 @@
                       "group": "influxdb",
                       "version": "v0",
                       "datasource": {
-                        "name": "cfkgpikynwnwgb"
+                        "name": "InfluxDB"
                       },
                       "spec": {
                         "groupBy": [
@@ -361,7 +361,7 @@
                       "group": "influxdb",
                       "version": "v0",
                       "datasource": {
-                        "name": "cfkgpikynwnwgb"
+                        "name": "InfluxDB"
                       },
                       "spec": {
                         "groupBy": [
@@ -508,7 +508,7 @@
                       "group": "influxdb",
                       "version": "v0",
                       "datasource": {
-                        "name": "cfkgpikynwnwgb"
+                        "name": "InfluxDB"
                       },
                       "spec": {
                         "groupBy": [
@@ -655,7 +655,7 @@
                       "group": "influxdb",
                       "version": "v0",
                       "datasource": {
-                        "name": "cfkgpikynwnwgb"
+                        "name": "InfluxDB"
                       },
                       "spec": {
                         "groupBy": [
@@ -705,7 +705,7 @@
                       "group": "influxdb",
                       "version": "v0",
                       "datasource": {
-                        "name": "cfkgpikynwnwgb"
+                        "name": "InfluxDB"
                       },
                       "spec": {
                         "groupBy": [
