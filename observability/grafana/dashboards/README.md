@@ -10,7 +10,7 @@ k6 → Kafka → Collector → InfluxDB v3 메트릭 시각화
 - Query Language: InfluxQL
 - URL: http://influxdb:8181
 - Database: k6_metrics
-- Header: Authorization: Token <INFLUX_TOKEN>
+- Header: Authorization: Bearer <INFLUX_TOKEN>
 
 > Grafana 컨테이너 내부에서는 `localhost`가 아닌 `influxdb`로 접근한다.
 

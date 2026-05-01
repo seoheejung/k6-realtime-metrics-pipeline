@@ -22,5 +22,5 @@ datasources:
 
     secureJsonData:
       # 실제 Header 값
-      # Token 인증 방식 사용 (InfluxDB v3)
+      # Bearer 인증 방식 사용 (InfluxDB v3)
       httpHeaderValue1: Bearer $__env{INFLUX_TOKEN}

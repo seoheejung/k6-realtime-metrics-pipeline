@@ -216,7 +216,6 @@ cd app
 ./gradlew bootRun
 ```
 
-
 ### 2. k6 커스텀 바이너리 빌드
 
 ```bash
@@ -316,6 +315,64 @@ GRAFANA_ADMIN_PASSWORD=<local-password>
 
 ---
 
+## InfluxDB 토큰 관리 (중요)
+
+InfluxDB v3는 토큰 기반 인증을 사용하며, 토큰 생성/적용 순서가 잘못되면 전체 파이프라인이 동작하지 않는다.
+
+### 핵심 규칙
+
+1. 토큰 생성은 항상 컨테이너 기동 이후 수행한다.
+2. `docker compose down -v` 실행 시 모든 토큰은 삭제된다.
+3. Collector, Grafana, 수동 테스트(curl)는 반드시 동일한 토큰을 사용해야 한다.
+4. 환경 변수 변경 후에는 컨테이너 재생성이 필요하다 (`restart`만으로는 반영되지 않을 수 있음).
+
+#### 1. InfluxDB 기동
+
+```bash
+docker compose up -d influxdb
+```
+
+#### 2. 토큰 생성
+```
+docker exec -it influxdb influxdb3 create token --admin
+```
+
+출력 예시
+```
+Token: apiv3_xxx
+Authorization: Bearer apiv3_xxx
+```
+
+#### 3. .env 반영
+- 루트 .env
+- collector\.env
+```
+INFLUX_TOKEN=apiv3_xxx
+```
+
+### 4. Collector 재생성
+```
+docker compose down
+docker compose up -d
+```
+
+#### 5. 정상 확인
+```
+docker compose logs -f collector
+```
+
+### ⚠️ 토큰 lifecycle 주의사항 (필수)
+
+InfluxDB v3 토큰은 데이터 디렉토리(volume)에 저장된다.
+
+다음 동작 시 토큰이 무효화된다:
+
+- `docker compose down -v`
+- InfluxDB volume 삭제
+- InfluxDB 컨테이너 재생성 (초기화 포함)
+
+---
+
 ## 정상 동작 기준
 
 1. k6 실행 시 오류 없이 요청 전송
@@ -398,7 +455,7 @@ Terraform은 인프라(VM, VNet, NSG, Public IP) 생성을 담당하고, Ansible
 4. k6 → Kafka 연결 (xk6-output-kafka 빌드 및 검증) ✅
 5. InfluxDB v3 적재 확인 ✅
 6. Grafana 대시보드 구성 ✅
-7. Grafana provisioning 구성 (datasource / dashboard 자동 로드)
+7. Grafana provisioning 구성 (datasource / dashboard 자동 로드) ✅
 8. 개선 사례 1건 확보 (병목 발견 → 수정 → 재측정)
 
 [확장]
