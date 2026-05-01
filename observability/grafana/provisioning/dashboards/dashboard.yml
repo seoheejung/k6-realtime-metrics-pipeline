@@ -1,0 +1,18 @@
+# Grafana dashboard provisioning
+# 지정된 경로의 JSON 파일을 자동으로 dashboard로 로드한다.
+
+apiVersion: 1
+
+providers:
+  - name: k6-realtime-metrics        # provider 이름 (임의)
+    orgId: 1                         # 기본 organization
+    folder: ''                       # Grafana UI에서 폴더 (빈값 = General)
+    type: file                       # 파일 기반 로딩
+    disableDeletion: false           # 파일 삭제 시 dashboard 제거 여부
+    updateIntervalSeconds: 10        # 파일 변경 감지 주기
+    allowUiUpdates: true             # UI에서 수정 허용
+
+    options:
+      # docker-compose에서 mount한 경로
+      # JSON dashboard 파일 위치
+      path: /var/lib/grafana/dashboards
