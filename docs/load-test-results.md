@@ -18,13 +18,12 @@
 ```
 
 ### Grafana 확인 지표
-| 지표          | 확인 목적              |
-| ----------- | ------------------ |
-| avg latency | 평균 응답 시간 확인        |
-| p95 latency | 상위 지연 구간 확인        |
-| RPS         | 처리량 확인             |
-| error rate  | 오류율 확인             |
-| kafka_lag   | Collector 처리 지연 확인 |
+| 지표 | 의미 | 기록값 |
+| --- | --- | --- |
+| Response Time | latency | avg latency, p95 latency |
+| Requests (RPS) | 처리량 | RPS |
+| Failed Requests | 오류 | error rate |
+| kafka_lag | Collector 처리 지연 | kafka_lag |
 
 ### 테스트 조건
 | 항목       | 값                          |
@@ -40,23 +39,39 @@
 ## 3. 병목 가설 및 개선 후보
 > 기준 부하 테스트에서 아래 패턴이 발생하는지 확인한다.
 
-- kafka_lag 증가
+- Response Time 급증
 - RPS 정체
-- latency 상승
+- VUs 증가 대비 성능 유지 안됨
+- kafka_lag 증가
 
-> 현재 구조에서 우선 확인할 병목 후보는 Collector → Influx write 구간이다.
-| 순위 | 위치                       | 이유                         |
-| -- | ------------------------ | -------------------------- |
-| 1  | Collector → Influx write | 네트워크 + batch 처리 + sync I/O |
-| 2  | Kafka lag                | consumer 처리속도 영향           |
-| 3  | API                      | 현재 단순 endpoint라 병목 가능성 낮음  |
+### 원인 분리 기준
+
+| 위치 | 의심 |
+| --- | --- |
+| API | CPU / DB / blocking |
+| Collector | batch / retry |
+| Kafka | lag |
+| Influx | write 지연 |
+
+
+### 병목 후보 우선순위
+
+현재 구조에서 우선 확인할 병목 후보는 Collector → Influx write 구간이다.
+
+| 순위 | 위치 | 이유 |
+| -- | -- | -- |
+| 1 | Collector → Influx write | 네트워크 + batch 처리 + sync I/O |
+| 2 | Kafka lag | consumer 처리속도 영향 |
+| 3 | API | 현재 단순 endpoint라 병목 가능성 낮음 |
 
 ### 개선 후보
-| 후보                | 변경 내용                        | 기대 효과                 |
-| ----------------- | ------------------------------------ | --------------------- |
-| batch size 증가     | `BATCH_SIZE = 500 → 2000`            | Influx write 호출 횟수 감소 |
-| flush interval 감소 | `FLUSH_INTERVAL_MS = 1000 → 200~300` | buffer 체류 시간 감소       |
-| async write 적용    | sync write → async write             | blocking I/O 영향 감소    |
+
+| 후보 | 변경 내용 | 기대 효과 |
+| --- | --- | --- |
+| batch-size 증가 | Collector batch size 증가 | Influx write 호출 횟수 감소 |
+| flush interval 조정 | Collector flush interval 조정 | buffer 체류 시간 및 write 주기 조정 |
+| API sleep 제거 | 테스트용 지연 로직 제거 | API 응답 지연 감소 |
+| thread pool 조정 | API 또는 Collector worker/thread pool 조정 | blocking 구간 처리량 개선 |
 
 
 ---
