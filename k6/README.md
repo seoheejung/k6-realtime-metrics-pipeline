@@ -85,9 +85,7 @@ TARGET_PATH=/api/endpoint
 ```
 ./k6/run_k6_test.sh smoke
 ```
-
-목적:
-
+#### 목적
 - 최소 연결 확인
 - 요청 성공 여부 확인
 
@@ -99,8 +97,7 @@ TARGET_PATH=/api/endpoint
 ./k6/run_k6_test.sh load
 ```
 
-목적:
-
+#### 목적
 - 정상 부하 구간 확인
 - p95 / error rate / throughput 확인
 
@@ -112,8 +109,7 @@ TARGET_PATH=/api/endpoint
 ./k6/run_k6_test.sh stress
 ```
 
-목적:
-
+#### 목적
 - 점진적 부하 증가
 - 병목 발생 시점 확인
 
