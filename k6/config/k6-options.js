@@ -58,17 +58,26 @@ function buildStressOptions() {
                 executor: "ramping-vus",
                 startVUs,
                 stages: [
-                    // 1단계: 낮은 부하
+                    // 1단계: 낮은 부하까지 증가
                     { duration: "30s", target: stage1Target },
 
-                    // 2단계: 중간 부하
+                    // 1단계 유지
+                    { duration: "1m", target: stage1Target },
+
+                    // 2단계: 중간 부하까지 증가
                     { duration: "30s", target: stage2Target },
 
-                    // 3단계: 높은 부하
+                    // 2단계 유지
+                    { duration: "1m", target: stage2Target },
+
+                    // 3단계: 높은 부하까지 증가
                     { duration: "30s", target: stage3Target },
 
+                    // 3단계 유지
+                    { duration: "1m", target: stage3Target },
+
                     // 종료 전 정리
-                    { duration: "10s", target: 0 },
+                    { duration: "30s", target: 0 },
                 ],
                 gracefulRampDown: "5s",
                 exec: "default",

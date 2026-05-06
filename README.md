@@ -179,7 +179,7 @@ feature/xxx
 | [kafka-strategy.md](docs/kafka-strategy.md) | Kafka topic 설정, bootstrap 주소 규칙, consumer 설정, offset 및 장애 처리 정책 |
 | [influx-schema.md](docs/influx-schema.md) | InfluxDB v3 measurement 스키마, Grafana 쿼리 예시 |
 | [influx-write-validation.md](docs/influx-write-validation.md) | InfluxDB v3 적재 검증 절차 (필수 검증 기준) |
-| [load-test-results.md](docs/load-test-results.md) | 부하 테스트 결과, 병목 분석, 개선 전후 비교 |
+| [load-test-results.md](docs/load-test-results.md) | 부하 테스트 결과, Collector → InfluxDB write 병목 분석, batch-size 개선 전후 비교 |
 | [grafana-dashboard.md](docs/grafana-dashboard.md) | Grafana 대시보드 구성, 쿼리, 검증 기준 |
 
 ---
@@ -299,6 +299,9 @@ docker compose logs -f collector
 - run_k6_test.sh는 환경 변수 BASE_URL을 기준으로 Kotlin API에 요청을 보낸다.
     - 기본값: http://localhost:8080
     - docker compose 환경: http://app:8080 (컨테이너 내부 DNS)
+- `load` 시나리오는 Before / After의 기본 응답 성능 비교에 사용한다.
+- `stress` 시나리오는 Collector → InfluxDB write 경로의 병목 확인과 개선 효과 검증에 사용한다.
+- 성능 개선 사례 결과는 `docs/load-test-results.md`에 기록한다.
 
 ### 7. Grafana 접속
 ```
@@ -418,6 +421,26 @@ InfluxDB v3 토큰은 데이터 디렉토리(volume)에 저장된다.
 | Collector TPS     | Collector 처리량 |
 | Kafka lag         | Kafka consumer lag |
 
+### Kafka consumer lag 확인
+
+Collector 처리 지연 여부는 Kafka consumer group lag로 확인한다.
+
+```bash
+docker exec -it kafka /opt/kafka/bin/kafka-consumer-groups.sh \
+  --bootstrap-server localhost:9092 \
+  --describe \
+  --group kotlin-collector
+```
+
+#### 확인 기준
+| 항목               | 의미                          |
+| ---------------- | --------------------------- |
+| `CURRENT-OFFSET` | Collector가 처리 완료한 offset    |
+| `LOG-END-OFFSET` | Kafka topic의 최신 offset      |
+| `LAG`            | 아직 Collector가 처리하지 못한 메시지 수 |
+
+> LAG가 지속적으로 증가하면 Collector → InfluxDB write 경로의 처리 지연을 의심한다.
+
 ---
 
 ## Azure 배포
@@ -456,9 +479,9 @@ Terraform은 인프라(VM, VNet, NSG, Public IP) 생성을 담당하고, Ansible
 5. InfluxDB v3 적재 확인 ✅
 6. Grafana 대시보드 구성 ✅
 7. Grafana provisioning 구성 (datasource / dashboard 자동 로드) ✅
-8. 개선 사례 1건 확보 (병목 발견 → 수정 → 재측정)
+8. 개선 사례 1건 확보 (병목 발견 → 수정 → 재측정) ✅
 
 [확장]
-8. Azure Terraform (VM, VNet, NSG)
-9. Azure Ansible (Docker 설치, 서비스 기동)
+9. Azure Terraform (VM, VNet, NSG)
+10. Azure Ansible (Docker 설치, 서비스 기동)
 ```
